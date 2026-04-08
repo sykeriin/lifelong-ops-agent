@@ -14,3 +14,6 @@ build/
 *.log
 smoke_test.log
 test_*.py
+
+# Don't ignore our env module!
+!env/
