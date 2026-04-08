@@ -26,12 +26,12 @@ class Reward(BaseModel):
 - ReadMemory (fail): -0.02
 - Answer: 0.0-1.0 (graded)
 
-### 3. ✅ HF_TOKEN Support
-**Before:** Only checked OPENAI_API_KEY
-**After:** Supports both OPENAI_API_KEY and HF_TOKEN
+### 3. ✅ Groq API Support
+**Implementation:** Uses Groq API with OpenAI-compatible interface
 
 ```python
-api_key = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN")
+api_key = os.getenv("GROQ_API_KEY")
+client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 ```
 
 ### 4. ✅ HuggingFace Space Metadata

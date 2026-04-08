@@ -11,11 +11,14 @@ class MemoryAgent:
     """
     
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN")
+        api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise ValueError("Set OPENAI_API_KEY or HF_TOKEN environment variable")
-        self.client = OpenAI(api_key=api_key)
-        self.model = os.getenv("MODEL_NAME", "gpt-4o-mini")
+            raise ValueError("Set GROQ_API_KEY environment variable")
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1"
+        )
+        self.model = os.getenv("MODEL_NAME", "llama-3.1-70b-versatile")
         self.step_count = 0
         self.kb_searched = False
     

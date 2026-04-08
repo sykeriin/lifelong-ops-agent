@@ -12,10 +12,8 @@
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Set your OpenAI API key (or HF_TOKEN)
-export OPENAI_API_KEY=your_key_here
-# OR
-export HF_TOKEN=your_huggingface_token_here
+# 2. Set your Groq API key
+export GROQ_API_KEY=your_groq_api_key_here
 
 # 3. Run the evaluation
 python inference.py
@@ -29,7 +27,9 @@ The evaluation will run for approximately 5-10 minutes (depending on API speed) 
 - 60 tickets in Week 3 (with more drift)
 - 60 tickets in Week 1 again (forgetting probe)
 
-Total: 240 episodes, ~720 LLM calls.
+Total: 240 episodes, ~720 Groq API calls.
+
+**Note:** Groq is generally faster than OpenAI, so evaluation may complete quicker.
 
 ## Running the Server
 

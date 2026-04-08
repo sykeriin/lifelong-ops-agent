@@ -112,7 +112,7 @@ The observation returned after each action contains:
 | Stateless  | TBD    | TBD    | TBD    | TBD        | TBD      | TBD      |
 | Memory     | TBD    | TBD    | TBD    | TBD        | TBD      | TBD      |
 
-(Run `python inference.py` with OPENAI_API_KEY set to populate this table)
+(Run `python inference.py` with GROQ_API_KEY set to populate this table)
 
 ## How to Run Locally
 
@@ -120,8 +120,8 @@ The observation returned after each action contains:
 # Install dependencies
 pip install -r requirements.txt
 
-# Run evaluation (requires OPENAI_API_KEY)
-export OPENAI_API_KEY=your_key_here
+# Run evaluation (requires GROQ_API_KEY)
+export GROQ_API_KEY=your_groq_api_key_here
 python inference.py
 
 # Or run the server
@@ -132,7 +132,7 @@ uvicorn server:app --port 8080
 
 ```bash
 docker build -t lifelong-ops .
-docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -p 8080:8080 lifelong-ops
+docker run -e GROQ_API_KEY=$GROQ_API_KEY -p 8080:8080 lifelong-ops
 ```
 
 ## Research Grounding
@@ -146,6 +146,13 @@ This benchmark is grounded in three research directions:
 3. **LOCOMO (Lifelong Optimization of Continual Memory)**: Studies how agents should decide what to remember and what to forget. Task C (legacy customers) directly tests this: agents must remember old policies while learning new ones.
 
 Key insight: SaaS ops is a perfect testbed for lifelong learning because policy versioning is explicit, ground truth is deterministic, and the forgetting/adaptation tradeoff is economically meaningful (wrong refund decisions cost money).
+
+## Implementation Notes
+
+- **LLM Backend**: Uses Groq API for fast inference with Llama 3.1 70B
+- **API Compatibility**: Groq uses OpenAI-compatible API, making it easy to switch providers
+- **Default Model**: `llama-3.1-70b-versatile` (fast and capable)
+- **Alternative Models**: Can use `llama-3.1-8b-instant` for faster/cheaper inference
 
 ## OpenEnv Compliance
 

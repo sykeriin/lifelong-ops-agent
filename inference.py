@@ -7,12 +7,12 @@ from eval.lifelong_eval import run_lifelong_eval
 
 def main():
     # Check for API key
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        print("ERROR: OPENAI_API_KEY or HF_TOKEN environment variable not set")
+        print("ERROR: GROQ_API_KEY environment variable not set")
         sys.exit(1)
     
-    model_name = os.getenv("MODEL_NAME", "gpt-4o-mini")
+    model_name = os.getenv("MODEL_NAME", "llama-3.1-70b-versatile")
     print(f"Using model: {model_name}")
     print("=" * 60)
     
