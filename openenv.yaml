@@ -1,0 +1,103 @@
+name: lifelong-ops-agent
+version: "1.0.0"
+description: >
+  A SaaS support/ops environment where world state (policies, pricing, features)
+  drifts across discrete weeks. Evaluates agents on per-ticket accuracy AND
+  lifelong metrics: adaptation speed and forgetting after policy changes.
+  Inspired by LifelongAgentBench and Continuum Memory Architectures research.
+
+tasks:
+  - id: task_a
+    name: "Ticket Triage & Routing"
+    difficulty: easy
+    description: "Classify and prioritize incoming support tickets under current world state."
+  - id: task_b
+    name: "Policy Application"
+    difficulty: medium
+    description: "Apply current refund/upgrade policies correctly to customer requests."
+  - id: task_c
+    name: "Legacy vs New Customer Handling"
+    difficulty: hard
+    description: "Apply versioned policies correctly — legacy customers retain old terms."
+
+observation_space:
+  type: object
+  properties:
+    week:
+      type: integer
+      description: Current week (1-3)
+    episode_id:
+      type: string
+      description: Unique episode identifier
+    step:
+      type: integer
+      description: Current step (0-5)
+    ticket:
+      type: object
+      description: Current support ticket
+    memory_keys:
+      type: array
+      items:
+        type: string
+      description: Available memory keys
+    visible_plans:
+      type: array
+      items:
+        type: object
+      description: Plan pricing information
+    message:
+      type: string
+      nullable: true
+      description: Result from last action
+
+action_space:
+  type: discriminated_union
+  discriminator: type
+  actions:
+    - name: WriteMemory
+      properties:
+        type:
+          const: WriteMemory
+        key:
+          type: string
+        value:
+          type: string
+    - name: ReadMemory
+      properties:
+        type:
+          const: ReadMemory
+        key:
+          type: string
+    - name: SearchKB
+      properties:
+        type:
+          const: SearchKB
+        query:
+          type: string
+    - name: Answer
+      properties:
+        type:
+          const: Answer
+        text:
+          type: string
+
+reward:
+  type: object
+  properties:
+    value:
+      type: float
+      range: [0.0, 1.0]
+      description: "Reward value. Intermediate actions: 0.05-0.1. Final answer: 0.0-1.0 based on grading."
+    breakdown:
+      type: object
+      nullable: true
+      description: "Optional breakdown of reward components"
+
+lifelong_metrics:
+  - forgetting_score
+  - adaptation_episodes_week2
+  - adaptation_episodes_week3
+
+episode_max_steps: 6
+evaluation_phases: 3
+reproducible: true
