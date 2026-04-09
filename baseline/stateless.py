@@ -1,20 +1,14 @@
 # STATUS: COMPLETE
 import os
-import json
-from openai import OpenAI
+
+from baseline.llm_client import get_openai_client
 
 
 class StatelessAgent:
     """Never reads or writes memory. Just searches KB and answers."""
     
     def __init__(self):
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("Set GROQ_API_KEY environment variable")
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
-        )
+        self.client = get_openai_client()
         self.model = os.getenv("MODEL_NAME", "llama-3.1-70b-versatile")
         self.step_count = 0
     

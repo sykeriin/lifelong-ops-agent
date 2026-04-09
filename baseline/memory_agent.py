@@ -1,7 +1,12 @@
 # STATUS: COMPLETE
+from __future__ import annotations
+
 import os
-import json
+from typing import Optional
+
 from openai import OpenAI
+
+from baseline.llm_client import get_openai_client
 
 
 class MemoryAgent:
@@ -10,14 +15,8 @@ class MemoryAgent:
     Reads memory before answering.
     """
     
-    def __init__(self):
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("Set GROQ_API_KEY environment variable")
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
-        )
+    def __init__(self, client: Optional[OpenAI] = None):
+        self.client = client if client is not None else get_openai_client()
         self.model = os.getenv("MODEL_NAME", "llama-3.1-70b-versatile")
         self.step_count = 0
         self.kb_searched = False

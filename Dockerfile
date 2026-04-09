@@ -3,7 +3,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-EXPOSE 8080
-ENV GROQ_API_KEY=""
-ENV MODEL_NAME="llama-3.1-70b-versatile"
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Hugging Face Spaces (Docker SDK) expect HTTP on 7860. Local: docker run -p 7860:7860 ...
+EXPOSE 7860
+ENV PORT=7860
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]

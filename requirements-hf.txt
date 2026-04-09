@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-openai
-pydantic>=2.0
-python-dotenv
-gradio
-requests

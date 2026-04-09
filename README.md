@@ -3,9 +3,7 @@ title: Lifelong Ops Agent Benchmark
 emoji: 🤖
 colorFrom: blue
 colorTo: green
-sdk: gradio
-sdk_version: 4.0.0
-app_file: app.py
+sdk: docker
 tags:
   - openenv
   - reinforcement-learning
@@ -17,149 +15,233 @@ pinned: false
 
 # Lifelong Ops Agent Benchmark
 
-## Problem Statement
+**An OpenEnv-compatible benchmark for evaluating LLM agents under scheduled policy drift.** Real SaaS support environments are non-stationary: refund windows change, pricing shifts, features launch and deprecate, and legacy customers keep grandfathered terms. This benchmark measures whether agents can **adapt** to new rules without **forgetting** old ones — the first OpenEnv environment to explicitly score **catastrophic forgetting** alongside per-ticket accuracy.
 
-Current agent benchmarks evaluate performance on static tasks with fixed rules. But real-world operations environments—especially SaaS customer support—are fundamentally non-stationary. Policies change, pricing evolves, features are added and deprecated, and legacy customers retain grandfathered terms while new customers face different rules. An agent that scores 95% on day one can catastrophically fail on day thirty if it hasn't adapted to policy drift or has forgotten how to handle legacy cases.
+> Live API: [HF Space](https://huggingface.co/spaces/sykeriin/lifelong-ops-agent) | Interactive playground: `/ui/` | Spec: `openenv.yaml`
 
-This benchmark addresses that gap. We simulate a realistic SaaS support environment where the world state (refund policies, plan pricing, feature availability) drifts across discrete "weeks." Agents are evaluated not just on per-ticket accuracy but on lifelong learning metrics: how quickly they adapt to new policies, and how much they forget about old ones. This is inspired by LifelongAgentBench, Continuum Memory Architectures (CMA), and LOCOMO research on catastrophic forgetting in LLM agents.
+---
 
-## Environment Overview
+## Why this benchmark exists
 
-The environment simulates a SaaS company's support operations across three weeks. Each week introduces policy changes:
+Current agent evaluations assume a fixed world. But a support agent deployed for weeks faces **distribution shift**: the refund policy it memorized on day one may be wrong by day fifteen. LifelongAgentBench, Continuum Memory Architectures, and LOCOMO research all identify this gap — realistic, non-stationary environments with **explicit forgetting metrics** are missing from the OpenEnv ecosystem. This benchmark fills that gap with a lightweight SaaS simulation that runs in minutes, not hours.
 
-- **Week 1**: Initial state. Refund window is 7 days. Pro plan costs $29/mo with analytics.
-- **Week 2**: Refund window changes to 30 days for NEW customers (legacy customers keep 7 days). Bulk export feature launches on Pro plan.
-- **Week 3**: Refund window changes again to 14 days for new customers. Pro plan price increases to $39/mo for new customers (legacy keeps $29). Analytics deprecated from Pro plan.
+---
 
-Agents must handle three task types:
+## Environment overview
 
-1. **Task A (Triage & Routing)**: Classify tickets by category (billing, feature, account, upgrade, refund) and assign priority (low, medium, high). Rules: refund requests and Enterprise customers are high priority.
+A SaaS company's support operations across **three weeks**, each introducing policy changes:
 
-2. **Task B (Policy Application)**: Apply the correct refund policy to customer requests. Must use the policy version that was active when the customer signed up, not the current policy.
+| Week | Refund window | Pro plan price | Key change |
+|------|---------------|----------------|------------|
+| 1 | 7 days | $29/mo | Baseline state |
+| 2 | 30 days (new customers) | $29/mo | Bulk export launches; legacy customers keep 7-day window |
+| 3 | 14 days (new customers) | $39/mo (new customers) | Analytics deprecated from Pro; legacy keeps $29 and 30-day window |
 
-3. **Task C (Legacy vs New Customer)**: The hardest task. 50% of tickets involve legacy customers who retain old pricing and policies. Agents must detect signup week and apply the correct grandfathered terms. Common failure mode: applying current 14-day window to a Week 2 customer who has 30 days.
+Legacy customers **always retain the policy that was active when they signed up**. This is the core difficulty: an agent must track **which** version of the rules applies to **which** customer.
 
-## Lifelong Metrics
+---
 
-We measure three core metrics beyond per-episode accuracy:
+## Tasks (3 tasks, easy to hard)
 
-1. **Accuracy per week**: `acc_t = (correct episodes in week t) / (total episodes in week t)`
-   - Measures performance under current world state
+### Task A — Ticket triage and routing (easy)
 
-2. **Forgetting score**: `forgetting = acc_1 - acc_1_after_drift`
-   - After training on weeks 1-3, we re-test on week-1-style tickets
-   - Positive forgetting score = agent degraded on old tasks after learning new policies
-   - Catastrophic forgetting shows up as forgetting > 0.2
+| | |
+|---|---|
+| **Log id** | `task_a` |
+| **Goal** | Classify the ticket by category (billing, feature, account, upgrade, refund) and assign priority (low, medium, high) |
+| **Why easy** | Rules are static: refund requests and Enterprise customers are always high priority |
+| **Grader** | +0.5 for correct category (case-insensitive substring), +0.5 for correct priority. Deterministic, partial credit. |
 
-3. **Adaptation speed**: Number of episodes in a new week until rolling 10-episode accuracy exceeds 0.8
-   - Measures how quickly agent learns new policies
-   - Fast adaptation: < 15 episodes. Slow: > 40 episodes.
+### Task B — Policy application (medium)
 
-## Reward Structure
+| | |
+|---|---|
+| **Log id** | `task_b` |
+| **Goal** | Apply the correct refund/upgrade policy to a customer request; produce the right decision (approve/deny) with the right reasoning |
+| **Why medium** | The agent must use the **current** policy version — but the version changes each week |
+| **Grader** | +0.4 decision correct, +0.4 key reason cited (correct refund window number), +0.2 no wrong policy numbers mentioned. Deterministic. |
 
-The environment provides both intermediate and terminal rewards:
+### Task C — Legacy vs new customers (hard)
 
-- **Intermediate rewards** (encourage good behavior):
-  - SearchKB with results: +0.1
-  - WriteMemory: +0.05
-  - ReadMemory (success): +0.05
-  - ReadMemory (key not found): -0.02
+| | |
+|---|---|
+| **Log id** | `task_c` |
+| **Goal** | Apply the **versioned** policy that matches the customer's signup week, not the current week |
+| **Why hard** | 50% of tickets involve legacy customers with grandfathered terms. The common LLM failure mode is applying the **current** 14-day window to a Week-2 customer who actually has **30 days**. Ground truth encodes a `legacy_trap` flag that catches exactly this confusion. |
+| **Grader** | +0.4 decision correct, +0.3 correct policy version implied (right window/price numbers), +0.3 legacy trap NOT triggered (wrong-version numbers absent). Deterministic. |
 
-- **Terminal reward** (final answer):
-  - 0.0-1.0 based on deterministic grading
-  - Task A: 0.5 (category) + 0.5 (priority)
-  - Task B: 0.4 (decision) + 0.4 (reason) + 0.2 (no wrong policy)
-  - Task C: 0.4 (decision) + 0.3 (correct policy) + 0.3 (no legacy trap)
+### Grader contract
 
-- **Penalties**:
-  - Step limit exceeded: 0.0
-  - Reading non-existent memory: -0.02
+All graders share the same interface: `grade(answer_text, ticket, world_state) -> {"score": float, "correct": bool, ...}`. Scores are **deterministic** (no LLM-in-the-loop grading), always in the **open interval (0, 1)** per platform requirements, and support **partial credit** so agents that get the decision right but cite the wrong policy still score above floor.
 
-## Action Space
+---
 
-Agents have four actions per episode (max 6 steps):
+## Lifelong evaluation protocol
 
-1. **SearchKB(query: str)**: Search knowledge base for policy articles. Returns top-3 matching articles with title, body, and validity window. Example: `SearchKB("refund policy")` returns v1, v2, v3 articles filtered by current week. **Reward: +0.1 for successful search**
-
-2. **WriteMemory(key: str, value: str)**: Store information in persistent memory. Memory survives across episodes and weeks. Example: `WriteMemory("policy_summary_w2", "30-day refund window for new customers")`. **Reward: +0.05**
-
-3. **ReadMemory(key: str)**: Retrieve stored information. Returns value or None. Example: `ReadMemory("policy_summary_w2")`. **Reward: +0.05 for success, -0.02 for missing key**
-
-4. **Answer(text: str)**: Submit final answer. Episode ends. Graded on decision correctness, reasoning quality, and absence of wrong policy numbers. **Reward: 0.0-1.0 based on grading**
-
-## Observation Space
-
-The observation returned after each action contains:
-
-- `week`: int - Current week (1-3)
-- `episode_id`: str - Unique episode identifier (UUID)
-- `step`: int - Current step in episode (0-5)
-- `ticket`: dict - Current support ticket with:
-  - `id`: str - Ticket ID
-  - `task_type`: str - "A", "B", or "C"
-  - `subject`: str - Ticket subject line
-  - `body`: str - Ticket body text
-  - `customer`: dict - Customer information (plan, signup_week, monthly_price_locked)
-  - `ground_truth`: dict - Ground truth for grading (not visible to agent in real deployment)
-- `memory_keys`: list[str] - List of available memory keys
-- `visible_plans`: list[dict] - Current plan pricing (name and monthly_price only)
-- `message`: str | None - Result message from last action (KB results, memory value, etc.)
-
-## Baseline Results
-
-| Agent      | W1 Acc | W2 Acc | W3 Acc | Forgetting | Adapt W2 | Adapt W3 |
-|------------|--------|--------|--------|------------|----------|----------|
-| Stateless  | TBD    | TBD    | TBD    | TBD        | TBD      | TBD      |
-| Memory     | TBD    | TBD    | TBD    | TBD        | TBD      | TBD      |
-
-(Run `python inference.py` with GROQ_API_KEY set to populate this table)
-
-## How to Run Locally
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run evaluation (requires GROQ_API_KEY)
-export GROQ_API_KEY=your_groq_api_key_here
-python inference.py
-
-# Or run the server
-uvicorn server:app --port 8080
+```
+Phase 1 (Week 1)  ──►  advance_week()  ──►  Phase 2 (Week 2)  ──►  advance_week()  ──►  Phase 3 (Week 3)
+                                                                                               │
+                                                                                    Forgetting probe
+                                                                                    (Week 1 tickets again,
+                                                                                     same memory object)
 ```
 
-## Docker Deployment
+**Persistent memory** is shared across all phases — the same `PersistentMemory` object persists from Week 1 through the forgetting probe. This is what makes the benchmark **lifelong**: an agent that blindly overwrites its memory with Week 3 policy summaries will fail on Week 1 tickets in the probe.
+
+### Metrics
+
+| Metric | Formula | Interpretation |
+|--------|---------|----------------|
+| **Accuracy (per week)** | `acc_t = mean(scores in week t)` | Raw performance under current world state |
+| **Forgetting** | `acc_1 - acc_1_after_drift` | Positive = degraded on old tasks after learning new policies; > 0.2 is catastrophic |
+| **Adaptation speed** | Episodes until rolling-10 accuracy > 0.8 | Fast: < 15. Slow: > 40. |
+
+---
+
+## Reward structure
+
+The environment provides **trajectory signal**, not just a terminal grade:
+
+| Action | Reward | Purpose |
+|--------|--------|---------|
+| `SearchKB` (results found) | +0.10 | Encourage information gathering |
+| `WriteMemory` | +0.05 | Encourage persistent storage |
+| `ReadMemory` (key exists) | +0.05 | Encourage memory use |
+| `ReadMemory` (key missing) | -0.02 | Penalize speculative reads |
+| `Answer` (terminal) | 0.001–0.999 | Graded score (partial credit) |
+| Step limit exceeded (6 steps) | Floor score | Hard cap prevents infinite loops |
+| Invalid action type | Floor score | Terminal, prevents undefined behavior |
+
+---
+
+## Action and observation spaces
+
+**Actions** (discriminated union, max 6 steps per episode):
+
+- `SearchKB(query)` — returns top-3 KB articles filtered by current week validity
+- `WriteMemory(key, value)` — persists across episodes and weeks
+- `ReadMemory(key)` — returns value or None
+- `Answer(text)` — ends episode, triggers grading
+
+**Observation** (returned after every action):
+
+- `week` (int), `episode_id` (str), `step` (int 0–5)
+- `ticket` — id, task_type, subject, body, customer info (plan, signup_week, locked price)
+- `memory_keys` — list of stored keys
+- `visible_plans` — current plan names and prices (partial view; full policy requires KB search)
+- `message` — result from last action (KB articles, memory value, etc.)
+
+---
+
+## Baseline results
+
+Model: **llama3.1:8b** via local Ollama. `N_PER_TASK=5` (smoke protocol, 60 episodes total). Seed 42.
+
+| Metric | Run 1 | Run 2 |
+|--------|-------|-------|
+| **W1 accuracy** | 0.653 | 0.657 |
+| **W2 accuracy** | 0.860 | 0.723 |
+| **W3 accuracy** | 0.813 | 0.760 |
+| **Forgetting** | 0.020 | -0.008 |
+| **Adapt W2** | 10 episodes | 39 episodes |
+| **Adapt W3** | 12 episodes | 28 episodes |
+
+Per-task (Run 1): Task A 0.60→0.90→0.70 | Task B 0.76→0.92→0.88 | Task C 0.60→0.76→0.86
+
+**Key observations:** (1) Task C improves across weeks as memory accumulates policy summaries — but forgetting is low, suggesting the agent doesn't overwrite old knowledge. (2) With a fast hosted API (Groq, HF router) and `N_PER_TASK=20`, full protocol completes well under the 20-minute budget on 2 vCPU / 8 GB.
+
+---
+
+## Quick start
+
+```bash
+pip install -r requirements.txt
+
+# Full protocol (hosted API, ~10 min)
+export API_BASE_URL=https://api.groq.com/openai/v1
+export MODEL_NAME=llama-3.1-70b-versatile
+export GROQ_API_KEY=your_key
+export N_PER_TASK=20
+python inference.py
+
+# Smoke test (local Ollama, ~20 min)
+export API_BASE_URL=http://127.0.0.1:11434
+export MODEL_NAME=llama3.1:8b
+export N_PER_TASK=5
+python inference.py
+```
+
+Structured logs (`[START]`/`[STEP]`/`[END]`) go to **stdout** (always on by default). Human-readable progress goes to **stderr**.
+
+## Docker
 
 ```bash
 docker build -t lifelong-ops .
-docker run -e GROQ_API_KEY=$GROQ_API_KEY -p 8080:8080 lifelong-ops
+docker run -p 7860:7860 lifelong-ops
+curl http://127.0.0.1:7860/health
+# Browser playground: http://127.0.0.1:7860/ui/
 ```
 
-## Research Grounding
+---
 
-This benchmark is grounded in three research directions:
+## OpenEnv compliance
 
-1. **LifelongAgentBench** (2024): Introduced multi-phase evaluation for agents, measuring adaptation and forgetting across task distribution shifts.
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/reset` | POST | New episode (body optional: `{}` or omit) |
+| `/step` | POST | Execute action, get observation + reward |
+| `/state` | GET | Current world state (debugging) |
+| `/health` | GET | `{"status": "healthy"}` |
+| `/metadata` | GET | Benchmark name + description |
+| `/schema` | GET | Action/observation/state schemas |
+| `/mcp` | POST | JSON-RPC stub |
+| `/ui/` | GET | Interactive browser playground |
 
-2. **Continuum Memory Architectures (CMA)**: Proposes persistent memory mechanisms to mitigate catastrophic forgetting in sequential learning. Our PersistentMemory class is a minimal CMA implementation.
+`openenv validate` passes both locally and against the live HF Space URL. See `openenv.yaml` for the full typed specification.
 
-3. **LOCOMO (Lifelong Optimization of Continual Memory)**: Studies how agents should decide what to remember and what to forget. Task C (legacy customers) directly tests this: agents must remember old policies while learning new ones.
+---
 
-Key insight: SaaS ops is a perfect testbed for lifelong learning because policy versioning is explicit, ground truth is deterministic, and the forgetting/adaptation tradeoff is economically meaningful (wrong refund decisions cost money).
+## Environment variables
 
-## Implementation Notes
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `API_BASE_URL` | Yes (hosted) | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint |
+| `MODEL_NAME` | Yes | `llama-3.1-70b-versatile` | Provider's model id |
+| `OPENAI_API_KEY` / `HF_TOKEN` / `GROQ_API_KEY` | One required (hosted) | — | First non-empty wins; localhost uses `"ollama"` placeholder |
+| `N_PER_TASK` | No | 20 (hosted) / 5 (localhost) | Episodes per task per phase |
+| `SUBMISSION_LOGS` | No | `1` | `[START]`/`[STEP]`/`[END]` on stdout |
 
-- **LLM Backend**: Uses Groq API for fast inference with Llama 3.1 70B
-- **API Compatibility**: Groq uses OpenAI-compatible API, making it easy to switch providers
-- **Default Model**: `llama-3.1-70b-versatile` (fast and capable)
-- **Alternative Models**: Can use `llama-3.1-8b-instant` for faster/cheaper inference
+---
 
-## OpenEnv Compliance
+## Research grounding
 
-This environment implements the OpenEnv HTTP API:
-- `POST /reset` - Initialize episode with seed and week
-- `POST /step` - Execute action, get observation + reward
-- `GET /state` - Inspect current world state (for debugging)
-- `GET /health` - Health check
+- **LifelongAgentBench** (2025): Multi-phase agent evaluation with adaptation and forgetting metrics across task distribution shifts.
+- **Continuum Memory Architectures**: Persistent memory mechanisms to mitigate catastrophic forgetting. Our `PersistentMemory` is a minimal CMA implementation.
+- **LOCOMO**: Studies what agents should remember vs forget. Task C (legacy customers) directly tests this.
 
-See `openenv.yaml` for full specification.
+**Key insight:** SaaS ops is a natural testbed for lifelong learning — policy versioning is explicit, ground truth is deterministic, and the forgetting/adaptation tradeoff has real economic meaning (wrong refund decisions cost money).
+
+---
+
+## Limitations
+
+- **Simulation fidelity:** Ticket text is template-generated, not sampled from real support logs. Real tickets have more noise and ambiguity.
+- **Grader scope:** Graders use keyword/substring matching, not semantic understanding. A correct answer with unusual phrasing may score lower than it deserves.
+- **Scale:** Three weeks and three tasks are enough to demonstrate drift and forgetting, but a production benchmark would benefit from longer horizons and more task families.
+- **Memory baseline only:** The shipped agent uses a simple heuristic (write KB summaries, read before answering). More sophisticated memory architectures (RAG, selective forgetting) are left for future work.
+
+---
+
+## Repository structure
+
+```
+inference.py          # Scored baseline (entry point)
+server/app.py         # FastAPI OpenEnv API + browser playground
+env/                  # World state, tasks, graders, KB, memory
+baseline/             # LLM client + memory agent
+eval/                 # Lifelong evaluation protocol + submission log format
+Dockerfile            # Docker image (port 7860)
+openenv.yaml          # OpenEnv typed spec
+pyproject.toml        # Project metadata + [project.scripts] server
+requirements.txt      # Runtime dependencies
+```

@@ -87,7 +87,9 @@ reward:
     value:
       type: float
       range: [0.0, 1.0]
-      description: "Reward value. Intermediate actions: 0.05-0.1. Final answer: 0.0-1.0 based on grading."
+      description: >
+        Step reward scalar. Intermediate actions may be small positives or small negatives (e.g. -0.02).
+        Final Answer scores are graded in [0,1] then mapped to the open interval (0,1) for submission validation.
     breakdown:
       type: object
       nullable: true

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lifelong-ops-agent"
+version = "1.0.0"
+description = "Lifelong Ops Agent benchmark (OpenEnv HTTP API)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "openai",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "openenv-core>=0.2.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*", "env*", "baseline*", "eval*"]

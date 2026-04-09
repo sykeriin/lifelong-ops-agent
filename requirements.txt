@@ -3,3 +3,4 @@ uvicorn
 openai
 pydantic>=2.0
 python-dotenv
+openenv-core>=0.2.0

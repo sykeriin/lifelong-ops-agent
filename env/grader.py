@@ -2,6 +2,21 @@
 from typing import Optional
 from env.world import WorldState
 
+# Submission validators require scores strictly in (0, 1). Values must survive stdout formatting:
+# score uses :.3f in submission_log — 1e-4 rounds to "0.000" and 1-1e-4 rounds to "1.000", which parsers reject.
+TASK_SCORE_MIN = 0.001
+TASK_SCORE_MAX = 0.999
+
+
+def clamp_task_score(score: float) -> float:
+    """Map grader output [0, 1] to (0, 1) strictly — never exactly 0.0 or 1.0."""
+    s = float(score)
+    if s <= 0.0:
+        return TASK_SCORE_MIN
+    if s >= 1.0:
+        return TASK_SCORE_MAX
+    return s
+
 
 def grade_task_a(answer: str, ground_truth: dict) -> float:
     """
@@ -17,8 +32,8 @@ def grade_task_a(answer: str, ground_truth: dict) -> float:
     
     if ground_truth["priority"].lower() in answer_lower:
         score += 0.5
-    
-    return score
+
+    return clamp_task_score(score)
 
 
 def grade_task_b(answer: str, ground_truth: dict, world_state: WorldState) -> float:
@@ -66,8 +81,8 @@ def grade_task_b(answer: str, ground_truth: dict, world_state: WorldState) -> fl
     
     if not has_wrong_number:
         score += 0.2
-    
-    return score
+
+    return clamp_task_score(score)
 
 
 def grade_task_c(answer: str, ground_truth: dict, world_state: WorldState) -> float:
@@ -117,8 +132,8 @@ def grade_task_c(answer: str, ground_truth: dict, world_state: WorldState) -> fl
     else:
         # No trap, give full points
         score += 0.3
-    
-    return score
+
+    return clamp_task_score(score)
 
 
 def grade(answer: str, ticket: dict, world_state: WorldState) -> dict:
@@ -138,7 +153,9 @@ def grade(answer: str, ticket: dict, world_state: WorldState) -> dict:
         score = grade_task_c(answer, ground_truth, world_state)
     else:
         raise ValueError(f"Unknown task type: {task_type}")
-    
+
+    score = clamp_task_score(score)
+
     # Try to detect policy version used in answer
     answer_lower = answer.lower()
     policy_version_used = "unknown"
@@ -148,7 +165,7 @@ def grade(answer: str, ticket: dict, world_state: WorldState) -> dict:
         policy_version_used = "v2"
     elif "14" in answer_lower and ("day" in answer_lower or "refund" in answer_lower):
         policy_version_used = "v3"
-    
+
     return {
         "score": score,
         "correct": score >= 0.8,

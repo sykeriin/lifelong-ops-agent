@@ -4,16 +4,21 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 ENV/
-.venv
 *.egg-info/
 dist/
 build/
 .env
+.env.*
 .DS_Store
 *.log
-smoke_test.log
-test_*.py
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/
+.cursor/
 
 # Don't ignore our env module!
 !env/

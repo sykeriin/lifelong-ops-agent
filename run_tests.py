@@ -149,14 +149,21 @@ def test_graders():
     """Test grading functions"""
     print("\nTesting graders...")
     try:
-        from env.grader import grade_task_a, grade_task_b, grade_task_c, grade
+        from env.grader import (
+            TASK_SCORE_MAX,
+            TASK_SCORE_MIN,
+            grade,
+            grade_task_a,
+            grade_task_b,
+            grade_task_c,
+        )
         
         # Test Task A grader
         score_a = grade_task_a("This is a billing issue with high priority", {
             "category": "billing",
             "priority": "high"
         })
-        assert score_a == 1.0, f"Should score 1.0, got {score_a}"
+        assert score_a == TASK_SCORE_MAX, f"Perfect raw score must clamp to open (0,1), got {score_a}"
         
         # Test Task B grader
         score_b = grade_task_b("I approve this refund within 30-day window", {
@@ -173,8 +180,11 @@ def test_graders():
             "policy_version_expected": "v1"
         }
         result = grade("This is a refund request with high priority", ticket, None)
-        assert result["score"] == 1.0, "Should score 1.0"
-        assert result["correct"] == True, "Should be correct"
+        assert result["score"] == TASK_SCORE_MAX, "Perfect raw score clamps to (0,1) open upper bound"
+        assert result["correct"] is True, "Should be correct"
+
+        bad = grade("", ticket, None)
+        assert bad["score"] == TASK_SCORE_MIN, "Empty answer clamps to open lower bound"
         
         print("✓ Graders correct")
         return True
