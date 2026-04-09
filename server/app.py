@@ -245,8 +245,9 @@ def get_state():
     }
 
 
-@app.get("/")
-def root():
+@app.get("/api")
+def api_discovery():
+    """JSON index for tools and scripts (browser root redirects to /ui/)."""
     return {
         "service": "lifelong-ops-agent",
         "docs": "OpenEnv HTTP API",
@@ -256,6 +257,12 @@ def root():
         "step": "POST /step",
         "state": "GET /state",
     }
+
+
+@app.get("/")
+def root():
+    """HF Space visitors: show playground HTML; use GET /api for JSON discovery."""
+    return RedirectResponse(url="/ui/", status_code=307)
 
 
 @app.get("/playground")

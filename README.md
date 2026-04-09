@@ -186,8 +186,12 @@ curl http://127.0.0.1:7860/health
 
 ## OpenEnv compliance
 
+Opening the Space base URL in a browser redirects to **`/ui/`** (playground). Machine-readable service index: **`GET /api`**.
+
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
+| `/` | GET | Redirect to `/ui/` |
+| `/api` | GET | JSON service index (routes and links) |
 | `/reset` | POST | New episode (body optional: `{}` or omit) |
 | `/step` | POST | Execute action, get observation + reward |
 | `/state` | GET | Current world state (debugging) |
