@@ -245,3 +245,10 @@ openenv.yaml          # OpenEnv typed spec
 pyproject.toml        # Project metadata + [project.scripts] server
 requirements.txt      # Runtime dependencies
 ```
+
+---
+
+## Contributors
+
+- [sykeriin](https://github.com/sykeriin)
+- [Palak11245](https://github.com/Palak11245)
